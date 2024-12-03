@@ -1,7 +1,6 @@
 import streamlit as st
-import pandas as pd
-import random
 import csv
+import random
 
 # Function to read the CSV file and convert it to the desired format
 def read_csv_to_dict(file_path):
@@ -16,26 +15,29 @@ def read_csv_to_dict(file_path):
             program_ratings[program] = ratings
     return program_ratings
 
-# Function Definitions for the Genetic Algorithm
+# Fitness function
 def fitness_function(schedule, ratings):
     total_rating = 0
     for time_slot, program in enumerate(schedule):
         total_rating += ratings[program][time_slot]
     return total_rating
 
+# Crossover
 def crossover(schedule1, schedule2):
     crossover_point = random.randint(1, len(schedule1) - 2)
     child1 = schedule1[:crossover_point] + schedule2[crossover_point:]
     child2 = schedule2[:crossover_point] + schedule1[crossover_point:]
     return child1, child2
 
+# Mutation
 def mutate(schedule, all_programs):
     mutation_point = random.randint(0, len(schedule) - 1)
     new_program = random.choice(all_programs)
     schedule[mutation_point] = new_program
     return schedule
 
-def genetic_algorithm(initial_schedule, ratings, all_programs, generations, population_size, crossover_rate, mutation_rate, elitism_size):
+# Genetic Algorithm
+def genetic_algorithm(ratings, initial_schedule, generations, population_size, crossover_rate, mutation_rate, elitism_size, all_programs):
     population = [initial_schedule]
     for _ in range(population_size - 1):
         random_schedule = initial_schedule.copy()
@@ -53,49 +55,49 @@ def genetic_algorithm(initial_schedule, ratings, all_programs, generations, popu
                 child1, child2 = crossover(parent1, parent2)
             else:
                 child1, child2 = parent1.copy(), parent2.copy()
-
             if random.random() < mutation_rate:
                 child1 = mutate(child1, all_programs)
             if random.random() < mutation_rate:
                 child2 = mutate(child2, all_programs)
-
             new_population.extend([child1, child2])
-
         population = new_population
-
     return population[0]
 
-# Streamlit Interface
-st.title("TV Scheduling using Genetic Algorithm")
-st.sidebar.header("Genetic Algorithm Parameters")
-file_path = st.sidebar.text_input("Path to CSV File", value="program_ratings.csv")
-generations = st.sidebar.number_input("Generations", min_value=10, max_value=500, value=100)
-population_size = st.sidebar.number_input("Population Size", min_value=10, max_value=100, value=50)
-crossover_rate = st.sidebar.slider("Crossover Rate (CO_R)", 0.0, 0.95, 0.8, 0.01)
-mutation_rate = st.sidebar.slider("Mutation Rate (MUT_R)", 0.01, 0.05, 0.2, 0.01)
-elitism_size = st.sidebar.number_input("Elitism Size", min_value=1, max_value=10, value=2)
+# Main Streamlit App
+st.title("TV Scheduling Optimization using Genetic Algorithm")
 
-if st.button("Run Genetic Algorithm"):
-    ratings = read_csv_to_dict(file_path)
+# File input
+uploaded_file = st.file_uploader("Upload the Modified_TV_Scheduling.csv file", type="csv")
+
+if uploaded_file:
+    ratings = read_csv_to_dict(uploaded_file)
     all_programs = list(ratings.keys())
     all_time_slots = list(range(6, 24))
+    initial_schedule = random.sample(all_programs, len(all_programs))
 
-    # Initialize with a brute-force optimal schedule
-    initial_schedule = random.sample(all_programs, len(all_time_slots))
-    final_schedule = genetic_algorithm(
-        initial_schedule,
-        ratings,
-        all_programs,
-        generations,
-        population_size,
-        crossover_rate,
-        mutation_rate,
-        elitism_size,
+    # Input parameters for Genetic Algorithm
+    st.sidebar.header("Genetic Algorithm Parameters")
+    CO_R = st.sidebar.slider("Crossover Rate (CO_R)", 0.0, 0.95, 0.8)
+    MUT_R = st.sidebar.slider("Mutation Rate (MUT_R)", 0.01, 0.05, 0.02)
+    GEN = st.sidebar.number_input("Generations (GEN)", 10, 500, 100, step=10)
+    POP = st.sidebar.number_input("Population Size (POP)", 10, 100, 50, step=10)
+    EL_S = st.sidebar.number_input("Elitism Size (EL_S)", 1, 10, 2)
+
+    # Run Genetic Algorithm
+    st.header("Resulting Schedule")
+    schedule = genetic_algorithm(
+        ratings=ratings,
+        initial_schedule=initial_schedule,
+        generations=GEN,
+        population_size=POP,
+        crossover_rate=CO_R,
+        mutation_rate=MUT_R,
+        elitism_size=EL_S,
+        all_programs=all_programs,
     )
-
-    # Display results
-    schedule_data = {
-        "Hour": [f"{hour}:00" for hour in all_time_slots],
-        "Program": final_schedule,
+    schedule_table = {
+        "Time Slot": [f"{slot:02d}:00" for slot in all_time_slots],
+        "Program": schedule,
     }
-    st.table(pd.DataFrame(schedule_data))
+    st.table(schedule_table)
+    st.write(f"Total Ratings: {fitness_function(schedule, ratings)}")
